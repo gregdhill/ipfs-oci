@@ -32,6 +32,15 @@ type ipfsImgRef struct {
 	logger *log.Logger
 }
 
+// NewImageReference returns a reference to an image stored on IPFS
+func NewImageReference(api iface.UnixfsAPI, path string, logger *log.Logger) ipfsImgRef {
+	return ipfsImgRef{
+		api,
+		path,
+		logger,
+	}
+}
+
 func (ref ipfsImgRef) Transport() types.ImageTransport {
 	return is.Transport
 }

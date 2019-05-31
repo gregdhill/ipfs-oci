@@ -8,16 +8,20 @@ Also...
 
 > A tall framework supporting a space rocket prior to launching.
 
-So a gantry is basically anything that is used to support the construction of a ship, space or otherwise. Now that's out of the way, let me actually 
-explain what this does. So the [Open Container Initiative](https://www.opencontainers.org/) is a sort of standards body that is helping to improve 
-the way we handle, store and run containers - hence the name. They host some great libraries, such as [this](https://github.com/containers/storage), which
-I found when I first started experimenting with [Buildah](https://github.com/containers/buildah) and [Podman](https://github.com/containers/libpod). 
-I've adapted some simple interfaces which use IPFS as a content addressed backend to host all layers that comprise an image, located at the Content 
-Identifier (CID) of it's manifest - also used to pull the image back into your local store.
+The [Open Container Initiative](https://www.opencontainers.org/) currently maintains specifications for [images](https://github.com/opencontainers/image-spec)
+and [runtimes](https://github.com/opencontainers/runtime-spec) which have been implemented by the [containers organization](https://github.com/containers), including 
+libraries such as [this](https://github.com/containers/storage) and tools such as [Buildah](https://github.com/containers/buildah) and [Podman](https://github.com/containers/libpod). 
+
+Gantry adapts some simple interfaces to further leverage IPFS as a storage backend to host all layers that comprise an image, located 
+at the Content Identifier (CID) of it's manifest. This allows anyone with knowledge of the manifest to pull the whole image from anywhere in the world. 
 
 ![Gantry](./gantry.jpg)
 
 ## Getting Started
+
+Requirements:
+ - [go-ipfs](https://github.com/ipfs/go-ipfs)
+ - [buildah](https://github.com/containers/buildah)
 
 Download any image to your local store:
 
@@ -25,7 +29,8 @@ Download any image to your local store:
 buildah from alpine
 ```
 
-Push the image to your configured IPFS node, then clear the local store:
+The only way to publish an image is to run a local IPFS node.
+You can then push the image to the running daemon, and clear the local image store:
 
 ```bash
 image=$(gantry push -o alpine)

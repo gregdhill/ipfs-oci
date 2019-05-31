@@ -48,10 +48,9 @@ func setupLocal(ctx context.Context) (*core.IpfsNode, error) {
 		return nil, err
 	}
 
-	node, err := core.NewNode(ctx, &core.BuildCfg{
+	return core.NewNode(ctx, &core.BuildCfg{
 		Repo: repo,
 	})
-	return node, err
 }
 
 func getContexts(store storage.Store) (*types.SystemContext, *signature.PolicyContext, error) {
@@ -117,14 +116,10 @@ func PushImage(logger *log.Logger, store storage.Store, imageName string) error 
 		return err
 	}
 
+	dstRef := NewImageReference(api.Unixfs(), "", logger)
 	srcRef, _, err := util.FindImage(store, "", systemContext, imageName)
 	if err != nil {
 		return err
-	}
-
-	dstRef := ipfsImgRef{
-		api:    api.Unixfs(),
-		logger: logger,
 	}
 
 	options := cp.Options{
@@ -160,13 +155,7 @@ func PullImage(logger *log.Logger, store storage.Store, cid, target string) erro
 		return err
 	}
 
-	// img *storage.Image
-	srcRef := ipfsImgRef{
-		api:    api.Unixfs(),
-		path:   cid,
-		logger: logger,
-	}
-
+	srcRef := NewImageReference(api.Unixfs(), cid, logger)
 	dstRef, err := is.Transport.ParseStoreReference(store, target)
 	if err != nil {
 		return err
