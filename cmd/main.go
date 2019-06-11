@@ -1,19 +1,22 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
+	"golang.org/x/net/context"
+
 	"github.com/containers/buildah/pkg/unshare"
-	"github.com/containers/storage/pkg/reexec"
-	"github.com/gregdhill/gantry"
+	gantry "github.com/gregdhill/gantry/image"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 var (
-	verbose bool
-	origin  string
-	target  string
+	debug bool
+	image string
+	name  string
+	cid   string
 
 	rootCmd = &cobra.Command{
 		Use: "gantry",
@@ -22,70 +25,88 @@ var (
 	pushCmd = &cobra.Command{
 		Use:   "push",
 		Short: "Push an image to IPFS",
-		Run: func(cmd *cobra.Command, args []string) {
-			if verbose {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if debug {
 				log.SetLevel(log.DebugLevel)
 			}
+
 			logger := log.WithFields(log.Fields{
-				"image": origin,
-			}).Logger
+				"image": image,
+			})
 
 			store, err := gantry.GetStore()
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			if err = gantry.PushImage(logger, store, origin); err != nil {
-				log.Fatal(err)
+			ctx := context.Background()
+			api, err := gantry.GetAPI(ctx)
+			if err != nil {
+				return err
 			}
+
+			return gantry.PushImage(ctx, logger, store, api, image)
 		},
 	}
 
 	pullCmd = &cobra.Command{
 		Use:   "pull",
 		Short: "Pull an image from IPFS",
-		Run: func(cmd *cobra.Command, args []string) {
-			if verbose {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if debug {
 				log.SetLevel(log.DebugLevel)
 			}
+
 			logger := log.WithFields(log.Fields{
-				"image": origin,
-			}).Logger
+				"image": image,
+			})
 
 			store, err := gantry.GetStore()
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 
-			if err = gantry.PullImage(logger, store, origin, target); err != nil {
-				log.Fatal(err)
+			ctx := context.Background()
+			api, err := gantry.GetAPI(ctx)
+			if err != nil {
+				return err
 			}
+
+			if name != "" {
+				cid, err = gantry.ResolveName(ctx, api, name)
+				if err != nil {
+					return err
+				}
+			} else if cid == "" {
+				return fmt.Errorf("require cid or name to resolve")
+			}
+
+			return gantry.PullImage(ctx, logger, store, api, cid, image)
 		},
 	}
 )
 
 func init() {
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Display verbose logging output")
+	log.SetFormatter(&log.JSONFormatter{})
+	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "Display debug logging output")
+
 	rootCmd.AddCommand(pushCmd)
+	pushCmd.Flags().StringVarP(&image, "image", "i", "", "Image to publish (required)")
+	pushCmd.MarkFlagRequired("image")
+
 	rootCmd.AddCommand(pullCmd)
-	pushCmd.Flags().StringVarP(&origin, "origin", "o", "", "Store image to push (required)")
-	pullCmd.Flags().StringVarP(&origin, "origin", "o", "", "IPFS CID to pull (required)")
-	pullCmd.Flags().StringVarP(&target, "target", "t", "", "Store image to write (required)")
-	pushCmd.MarkFlagRequired("origin")
-	pullCmd.MarkFlagRequired("origin")
-	pullCmd.MarkFlagRequired("target")
+	pullCmd.Flags().StringVarP(&image, "image", "i", "", "Image to write (required)")
+	pullCmd.Flags().StringVarP(&cid, "cid", "c", "", "Content identifier to pull (required)")
+	pullCmd.Flags().StringVarP(&name, "name", "n", "", "Mutable link to resolve (required)")
+	pullCmd.MarkFlagRequired("image")
+	pullCmd.MarkFlagRequired("cid")
 }
 
-func Execute() {
+func main() {
 	// always do this first
-	reexec.Init()
 	unshare.MaybeReexecUsingUserNamespace(false)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
-}
-
-func main() {
-	Execute()
 }

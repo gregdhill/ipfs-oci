@@ -1,4 +1,4 @@
-package gantry
+package image
 
 import (
 	"bytes"
@@ -28,15 +28,15 @@ var ConfigAddress string
 
 type ipfsImgRef struct {
 	api    iface.UnixfsAPI
-	path   string
-	logger *log.Logger
+	cid    string
+	logger *log.Entry
 }
 
 // NewImageReference returns a reference to an image stored on IPFS
-func NewImageReference(api iface.UnixfsAPI, path string, logger *log.Logger) ipfsImgRef {
+func NewImageReference(logger *log.Entry, api iface.UnixfsAPI, cid string) ipfsImgRef {
 	return ipfsImgRef{
 		api,
-		path,
+		cid,
 		logger,
 	}
 }
@@ -71,7 +71,7 @@ func (ref ipfsImgRef) NewImage(ctx context.Context, sc *types.SystemContext) (ty
 
 func (ref ipfsImgRef) NewImageSource(ctx context.Context, sys *types.SystemContext) (types.ImageSource, error) {
 	ref.logger.Debug("Initializing IPFS source")
-	node, err := ref.api.Get(ctx, ipfsPath.New(ref.path))
+	node, err := ref.api.Get(ctx, ipfsPath.New(ref.cid))
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +115,7 @@ type ipfsImgSrc struct {
 	api     iface.UnixfsAPI
 	man     []byte
 	manType string
-	logger  *log.Logger
+	logger  *log.Entry
 }
 
 func (src ipfsImgSrc) Reference() types.ImageReference {
@@ -171,7 +171,7 @@ func (src ipfsImgSrc) LayerInfosForCopy(ctx context.Context) ([]types.BlobInfo, 
 
 type ipfsImgDst struct {
 	api    iface.UnixfsAPI
-	logger *log.Logger
+	logger *log.Entry
 }
 
 func (dst ipfsImgDst) Reference() types.ImageReference {

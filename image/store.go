@@ -1,4 +1,4 @@
-package gantry
+package image
 
 import (
 	"context"
@@ -13,45 +13,9 @@ import (
 	is "github.com/containers/image/storage"
 	"github.com/containers/image/types"
 	"github.com/containers/storage"
-	config "github.com/ipfs/go-ipfs-config"
-	"github.com/ipfs/go-ipfs/core"
-	"github.com/ipfs/go-ipfs/core/coreapi"
-	"github.com/ipfs/go-ipfs/plugin/loader"
-	"github.com/ipfs/go-ipfs/repo/fsrepo"
+	iface "github.com/ipfs/interface-go-ipfs-core"
 	log "github.com/sirupsen/logrus"
 )
-
-func loadConfig(path string) (*config.Config, error) {
-	return fsrepo.ConfigAt(path)
-}
-
-func setupLocal(ctx context.Context) (*core.IpfsNode, error) {
-	path, err := fsrepo.BestKnownPath()
-	if err != nil {
-		return nil, err
-	}
-
-	pluginpath := filepath.Join(path, "plugins")
-	plugins, err := loader.NewPluginLoader(pluginpath)
-	if err != nil {
-		return nil, err
-	}
-	if err = plugins.Initialize(); err != nil {
-		return nil, err
-	}
-	if err = plugins.Inject(); err != nil {
-		return nil, err
-	}
-
-	repo, err := fsrepo.Open(path)
-	if err != nil {
-		return nil, err
-	}
-
-	return core.NewNode(ctx, &core.BuildCfg{
-		Repo: repo,
-	})
-}
 
 func getContexts(store storage.Store) (*types.SystemContext, *signature.PolicyContext, error) {
 	systemContext := &types.SystemContext{}
@@ -98,26 +62,19 @@ func GetStore() (storage.Store, error) {
 }
 
 // PushImage to IPFS
-func PushImage(logger *log.Logger, store storage.Store, imageName string) error {
+func PushImage(ctx context.Context, logger *log.Entry, store storage.Store, api iface.CoreAPI, image string) error {
 	systemContext, policyContext, err := getContexts(store)
 	if err != nil {
 		return err
 	}
 	defer policyContext.Destroy()
 
-	ctx := context.Background()
-	node, err := setupLocal(ctx)
+	dstRef := NewImageReference(logger, api.Unixfs(), "")
 	if err != nil {
 		return err
 	}
 
-	api, err := coreapi.NewCoreAPI(node)
-	if err != nil {
-		return err
-	}
-
-	dstRef := NewImageReference(api.Unixfs(), "", logger)
-	srcRef, _, err := util.FindImage(store, "", systemContext, imageName)
+	srcRef, _, err := util.FindImage(store, "", systemContext, image)
 	if err != nil {
 		return err
 	}
@@ -137,26 +94,15 @@ func PushImage(logger *log.Logger, store storage.Store, imageName string) error 
 }
 
 // PullImage from IPFS
-func PullImage(logger *log.Logger, store storage.Store, cid, target string) error {
+func PullImage(ctx context.Context, logger *log.Entry, store storage.Store, api iface.CoreAPI, cid, image string) error {
 	systemContext, policyContext, err := getContexts(store)
 	if err != nil {
 		return err
 	}
 	defer policyContext.Destroy()
 
-	ctx := context.Background()
-	node, err := setupLocal(ctx)
-	if err != nil {
-		return err
-	}
-
-	api, err := coreapi.NewCoreAPI(node)
-	if err != nil {
-		return err
-	}
-
-	srcRef := NewImageReference(api.Unixfs(), cid, logger)
-	dstRef, err := is.Transport.ParseStoreReference(store, target)
+	srcRef := NewImageReference(logger, api.Unixfs(), cid)
+	dstRef, err := is.Transport.ParseStoreReference(store, image)
 	if err != nil {
 		return err
 	}
